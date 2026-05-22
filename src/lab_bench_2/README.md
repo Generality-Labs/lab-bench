@@ -89,6 +89,15 @@ uv run inspect eval lab_bench_2/lab_bench_2 \
   --model-role grader=anthropic/claude-sonnet-4-5
 ```
 
+## Attribution
+
+This evaluation depends on the reference implementation's
+[`labbench2`](https://github.com/EdisonScientific/labbench2) package for its
+deterministic scientific scoring functions (used by the sequence and cloning
+tags). That code is licensed **CC BY-SA 4.0**. We pull it in as a dependency —
+pinned to a specific commit in `pyproject.toml` (`[tool.uv.sources]`) — rather
+than vendoring (copying) the code into this repository.
+
 ## Evaluation Report
 
 TODO: A brief summary of results for your evaluation implementation compared against a standard set of existing results.

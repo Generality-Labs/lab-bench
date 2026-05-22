@@ -152,6 +152,10 @@ dependencies = [
 lab_bench_2 = "lab_bench_2"
 
 [project.optional-dependencies]
+# Reference implementation's deterministic scoring code (CC BY-SA 4.0), scoped to
+# this eval rather than core. Pulled as a dependency rather than vendored; source
+# + pin in [tool.uv.sources]. See src/lab_bench_2/README.md.
+lab_bench_2 = ["labbench2"]
 test = []
 
 [dependency-groups]
@@ -180,3 +184,6 @@ ignore = ["W005", "W009"]
 environments = [
     "python_version >= '3.11'",
 ]
+
+[tool.uv.sources]
+labbench2 = { git = "https://github.com/EdisonScientific/labbench2.git", rev = "c028ecdcf144b55ffcd92b68be45081df5628c20" }
