@@ -107,6 +107,11 @@ module = ["datasets", "datasets.*"]
 ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
+# Upstream labbench2 git dep has no py.typed marker / stubs.
+module = ["evals", "evals.*"]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
 # Test files import these helpers via runtime sys.path manipulation, so
 # mypy can't resolve them statically. Treat them as untyped.
 module = ["add_readme_section", "generate_readmes"]

@@ -6,9 +6,6 @@ from lab_bench_2.dataset import (
     record_to_sample,
 )
 from lab_bench_2.lab_bench_2 import SUPPORTED_TAGS, Mode, lab_bench_2
-from lab_bench_2.prompts import (
-    SEMANTIC_JUDGE_TEMPLATE,
-)
 from lab_bench_2.scorers import (
     DEFAULT_GRADER_MODEL,
     parse_judge_verdict,
@@ -22,7 +19,6 @@ __all__ = [
     "LAB_BENCH_2_DATASET_PATH",
     "LAB_BENCH_2_DATASET_REVISION",
     "LAB_BENCH_2_DATASET_SPLIT",
-    "SEMANTIC_JUDGE_TEMPLATE",
     "SUPPORTED_TAGS",
     "Mode",
     "bare",

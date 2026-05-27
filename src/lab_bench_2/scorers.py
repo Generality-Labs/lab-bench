@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import re
+
 from inspect_ai.model import GenerateConfig, get_model
 from inspect_ai.scorer import (
     CORRECT,
@@ -15,19 +17,22 @@ from inspect_ai.scorer import (
 )
 from inspect_ai.solver import TaskState
 
-from lab_bench_2.prompts import (
-    _GRADE_PATTERN,
-    JUDGE_VERDICT_CORRECT,
-    SEMANTIC_JUDGE_TEMPLATE,
-)
-
 DEFAULT_GRADER_MODEL = "anthropic/claude-sonnet-4-5"
 GRADER_ROLE = "grader"
+
+JUDGE_VERDICT_CORRECT = "correct"
+JUDGE_VERDICT_INCORRECT = "incorrect"
+JUDGE_VERDICT_UNSURE = "unsure"
+_GRADE_PATTERN = re.compile(
+    r"\bresult\b[^A-Za-z]*(correct|incorrect|unsure)\b",
+    re.IGNORECASE,
+)
 
 
 @scorer(metrics=[accuracy(), stderr()])
 def semantic_judge_scorer() -> Scorer:
     """Grade an open-ended answer against the reference using a judge model."""
+    from evals.prompts import STRUCTURED_EVALUATION_PROMPT
 
     async def score(state: TaskState, target: Target) -> Score:
         answer = state.output.completion.strip()
@@ -42,9 +47,9 @@ def semantic_judge_scorer() -> Scorer:
             config=GenerateConfig(temperature=0.0),
         )
 
-        prompt = SEMANTIC_JUDGE_TEMPLATE.format(
+        prompt = STRUCTURED_EVALUATION_PROMPT.format(
             question=state.input_text,
-            reference=target.text,
+            correct_answer=target.text,
             answer=answer,
         )
         result = await grader.generate(prompt)
