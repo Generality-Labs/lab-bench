@@ -86,7 +86,7 @@ for example:
 ```bash
 uv run inspect eval lab_bench_2/lab_bench_2 \
   --model openai/gpt-5-nano \
-  --model-role grader=anthropic/claude-sonnet-4-5
+  --model-role grader=anthropic/claude-opus-4-1-20250805
 ```
 
 ## Attribution
