@@ -257,6 +257,7 @@ class TestCloningScorer:
         # then
         assert result == Score(
             value=CORRECT,
+            answer="<protocol>assemble</protocol>",
             explanation="Cloning validation passed",
             metadata={"cloning_score": 1.0},
         )
@@ -344,6 +345,7 @@ class TestSeqqa2Scorer:
         # then
         assert result == Score(
             value=CORRECT,
+            answer="<answer>pass</answer>",
             explanation="Validator 'dummy_validator' passed",
             metadata={"validator": "dummy_validator", "validator_score": 1.0},
         )
