@@ -87,7 +87,6 @@ def record_to_sample(record: dict[str, Any], mode: Mode = "inject") -> Sample:
 def load_lab_bench_2_dataset(
     tag: str,
     mode: Mode = "inject",
-    limit: int | None = None,
 ) -> Dataset:
     """Load a single LAB-Bench 2 tag, pinned to a fixed dataset revision.
 
@@ -95,7 +94,6 @@ def load_lab_bench_2_dataset(
         tag: The dataset config to load (e.g. ``"litqa3"``).
         mode: How to deliver question files (``inject`` / ``file`` / ``retrieve``).
             No-op for file-less tags.
-        limit: Optional cap on the number of samples loaded.
     """
 
     def to_samples(record: dict[str, Any]) -> list[Sample]:
@@ -113,7 +111,6 @@ def load_lab_bench_2_dataset(
         split=LAB_BENCH_2_DATASET_SPLIT,
         revision=LAB_BENCH_2_DATASET_REVISION,
         sample_fields=to_samples,
-        limit=limit,
     )
 
 
