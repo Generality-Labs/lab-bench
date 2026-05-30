@@ -6,10 +6,66 @@ single-turn) and an agentic configuration with provider-native tools.
 
 from __future__ import annotations
 
-from inspect_ai.solver import Solver, generate, solver
+from typing import Literal
+
+from inspect_ai.solver import Solver, chain, generate, solver, use_tools
+from inspect_ai.tool import Tool, code_execution, web_search
+
+SolverType = Literal["bare", "tools"]
 
 
 @solver
 def bare() -> Solver:
     """The benchmark's "bare" configuration: a plain single-turn ``generate()``."""
     return generate()
+
+
+def native_tools() -> list[Tool]:
+    """Provider-native, server-side tools for the agentic configuration.
+
+    ``web_search()`` and ``code_execution()`` run on the model provider's
+    servers; Inspect auto-selects the internal provider that matches the active
+    model. ``providers={"python": False}`` disables the sandboxed ``python()``
+    fallback so no local sandbox is required.
+
+    TODO Add web_fetch when Inspect adds support for it.
+    The paper uses a 3rd tool WebFetch, it is omitted here due to lack of
+    support in Inspect.
+    """
+    return [
+        web_search(),
+        code_execution(
+            providers={"python": False}
+        ),  # disable python fallback code_interpreter
+    ]
+
+
+@solver
+def tools() -> Solver:
+    """The benchmark's agentic ("tools") configuration.
+
+    Gives the model the provider-native tools from :func:`native_tools` and runs
+    Inspect's tool-use loop, which drives each provider's server-side tool
+    round-trips.
+    """
+    return chain(
+        use_tools(native_tools()),
+        generate(tool_calls="loop"),
+    )
+
+
+SOLVERS_BY_TYPE = {
+    "bare": bare,
+    "tools": tools,
+}
+
+
+def solver_for_type(solver_type: SolverType) -> Solver:
+    """Return the solver for a type, or raise if the type is not yet implemented."""
+    factory = SOLVERS_BY_TYPE.get(solver_type)
+    if factory is None:
+        raise NotImplementedError(
+            f"No solver implemented for type={solver_type!r}; "
+            f"supported types: {sorted(SOLVERS_BY_TYPE)}."
+        )
+    return factory()
