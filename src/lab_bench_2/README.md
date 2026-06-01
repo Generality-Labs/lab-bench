@@ -93,19 +93,28 @@ This eval uses the public `EdisonScientific/labbench2` dataset on Hugging Face, 
 
 For file-bearing tags, the loader filters out questions that don't opt into
 the requested `mode` (per each question's `QuestionMode` flags in the HF
-data). At the time of writing every file-bearing tag (`protocolqa2`,
-`sourcequality`, `figqa2-img`, `figqa2-pdf`, `tableqa2-img`, `tableqa2-pdf`)
-opts into `file` only, so passing any other `mode` would load zero samples.
-Note that the base `figqa2`, `tableqa2`, and `suppqa2` configs carry no files
-(mode is a no-op); the image/PDF variants are the file-bearing ones. `seqqa2` is
-the exception: all of its questions opt into `file` and `inject`, while only a
-subset opt into `retrieve` (so `mode="retrieve"` loads fewer samples). The mode
-flags live in the dataset and may change — verify by running with the
-configuration you intend before drawing conclusions from sample counts.
+data). 
+
+** Relationship between the tag and mode parameters**
+
+Tags describe groups of samples/questions whilst mode describes how data files are uploaded. Not every sample is compatible with each mode of data uploading; if incompatible they are not loaded into the eval. 
+Each sample in the dataset contains flags for compatible modes - this may change and sample counts can be verified by running with the configuration you intend before drawing conclusions from sample counts.
+
+For most tags, those that uses files requires the `file` mode. For example; 
+
+`uv run inspect eval lab_bench_2/lab_bench_2 -T tag=sourcequality -T mode=retrieve`
+
+ Will result in no samples being loaded in. This is also true for tags protocolqa2`,`sourcequality`, `figqa2-img`, `figqa2-pdf`, `tableqa2-img`, `tableqa2-pdf`.
+ 
+Note that the base `figqa2`, `tableqa2`, and `suppqa2` tags have no files (mode is a no-op). Their image/PDF variants do have files and are impacted by the above.
+
+`seqqa2` is the exception: all of its samples are compatible with `file` and `inject`, while only a
+subset of this tag can be used with`retrieve` (so `mode="retrieve"` loads fewer samples). 
 
 ## Scoring
 
-Answers are graded by an LLM judge. The judge compares the model's answer to
+There are different scoring methods for the tags.
+Some tags are scored deterministically (see x and y) but most are graded by an LLM judge. The judge compares the solver's answer to
 the reference, accepting semantically or numerically equivalent answers, and
 returns one of `correct` / `incorrect` / `unsure`; a `correct` verdict scores
 1.0 and everything else (including unparseable or empty judgements) scores 0.0.
@@ -133,7 +142,7 @@ reused. To install Go: `brew install go` (macOS), `sudo apt install golang-go` (
 or <https://go.dev/dl/>. Without Go, protocol execution fails gracefully: PCR-based
 samples score 0.0 with an explanatory reason rather than crashing the run.
 
-The `seqqa2` tag is likewise scored deterministically — never by an LLM judge. A
+The `seqqa2` tag is also scored deterministically. A
 per-question validator (selected by the question's `type`) checks the answer
 extracted via that question's `answer_regex`; extraction tolerates line-wrapped
 or whitespace-separated sequences.
