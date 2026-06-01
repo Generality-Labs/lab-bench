@@ -72,8 +72,6 @@ def _judge_score(prompt_template: str) -> Scorer:
             correct_answer=target.text,
             answer=answer,
         )
-        # Pass config on the generate() call (not get_model): a role-bound
-        # grader is returned as-is by get_model, dropping any config given there.
         result = await grader.generate(
             prompt,
             config=GenerateConfig(temperature=0.0, response_schema=response_schema),
@@ -211,6 +209,7 @@ def seqqa2_scorer() -> Scorer:
             return Score(
                 value=INCORRECT,
                 explanation="Failed to extract answer from model output.",
+                metadata={"raw_answer": raw_answer, "extracted": extracted},
             )
 
         if "answer" in extracted and validator.answer_param != "answer":

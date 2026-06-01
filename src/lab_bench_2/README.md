@@ -43,6 +43,15 @@ ANTHROPIC_API_KEY=<anthropic-api-key>
 ```
 <!-- /Usage: Automatically Generated -->
 
+### Additional Usage Notes
+
+The `cloning` tag scorer runs a PCR (Polymerase Chain Reaction) simulation using
+a small Go binary that labbench2 compiles on first use, so a
+Go toolchain (1.21+) must be available on the host the first time you score
+`cloning`; the compiled binary is then cached inside the installed package and
+reused. To install Go: `brew install go` (macOS), `sudo apt install golang-go` (Linux),
+or <https://go.dev/dl/>.
+
 <!-- Options: Automatically Generated -->
 ## Options
 
@@ -63,7 +72,7 @@ See `uv run inspect eval --help` for all available options.
 ### `lab_bench_2`
 
 - `tag` (str): Which LAB-Bench 2 subset to run. Supported tags: ``cloning``, ``dbqa2``, ``figqa2`` (and ``figqa2-img`` / ``figqa2-pdf``), ``litqa3``, ``patentqa``, ``protocolqa2``, ``seqqa2``, ``sourcequality``, ``suppqa2``, ``tableqa2`` (and ``tableqa2-img`` / ``tableqa2-pdf``), ``trialqa``. (default: `'litqa3'`)
-- `mode` (Mode): How a question's data files are delivered to the model. A no-op for tags without files (such as litqa3). Options: ``file``: Files uploaded via API. PDFs/images attached as context; other files as document attachments., ``inject``: Text file contents concatenated into the prompt as text., ``retrieve``: Only file names/stems are given; prompt instructs the agent to retrieve the necessary sequences or data from a source of its choosing. File contents are withheld. (default: `'inject'`)
+- `mode` (Mode): How a question's data files are delivered to the model. A no-op for tags without files (such as litqa3). Options: ``file``: Files uploaded via API. PDFs/images attached as context; other files as document attachments., ``inject``: Text file contents concatenated into the prompt as text., ``retrieve``: Only file names/stems are given; prompt instructs the agent to retrieve the necessary sequences or data from a source of its choosing. File contents are withheld. (default: `'file'`)
 - `solver` (Solver | None): The solver to run. Defaults to ``bare()`` (the benchmark's "bare" configuration: a plain single-turn ``generate()``) when not provided. Pass any Inspect solver to override, e.g. ``-T solver=bare`` on the CLI. (default: `None`)
 <!-- /Parameters: Automatically Generated -->
 
@@ -93,32 +102,37 @@ This eval uses the public `EdisonScientific/labbench2` dataset on Hugging Face, 
 
 For file-bearing tags, the loader filters out questions that don't opt into
 the requested `mode` (per each question's `QuestionMode` flags in the HF
-data). 
+data).
 
-** Relationship between the tag and mode parameters**
+#### Relationship between the tag and mode parameters
 
-Tags describe groups of samples/questions whilst mode describes how data files are uploaded. Not every sample is compatible with each mode of data uploading; if incompatible they are not loaded into the eval. 
-Each sample in the dataset contains flags for compatible modes - this may change and sample counts can be verified by running with the configuration you intend before drawing conclusions from sample counts.
+Tags describe groups of samples/questions whilst mode describes how data files are uploaded.
+Not every sample is compatible with each mode of data uploading; if incompatible they are not loaded into the eval.
+Each sample in the dataset contains flags for compatible modes - this may change and sample counts
+can be verified by running with the configuration you intend before drawing conclusions from sample counts.
 
-For most tags, those that uses files requires the `file` mode. For example; 
+For most tags, those that uses files requires the `file` mode. For example;
 
-`uv run inspect eval lab_bench_2/lab_bench_2 -T tag=sourcequality -T mode=retrieve`
+`uv run inspect eval lab_bench_2 -T tag=sourcequality -T mode=retrieve`
 
- Will result in no samples being loaded in. This is also true for tags protocolqa2`,`sourcequality`, `figqa2-img`, `figqa2-pdf`, `tableqa2-img`, `tableqa2-pdf`.
- 
+ Will result in no samples being loaded in. This is also true for tags protocolqa2`,`sourcequality`,`figqa2-img`,`figqa2-pdf`,`tableqa2-img`,`tableqa2-pdf`.
+
 Note that the base `figqa2`, `tableqa2`, and `suppqa2` tags have no files (mode is a no-op). Their image/PDF variants do have files and are impacted by the above.
 
 `seqqa2` is the exception: all of its samples are compatible with `file` and `inject`, while only a
-subset of this tag can be used with`retrieve` (so `mode="retrieve"` loads fewer samples). 
+subset of this tag can be used with`retrieve` (so `mode="retrieve"` loads fewer samples).
 
 ## Scoring
 
 There are different scoring methods for the tags.
-Some tags are scored deterministically (see x and y) but most are graded by an LLM judge. The judge compares the solver's answer to
-the reference, accepting semantically or numerically equivalent answers, and
-returns one of `correct` / `incorrect` / `unsure`; a `correct` verdict scores
-1.0 and everything else (including unparseable or empty judgements) scores 0.0.
-Reported metrics are `accuracy` and `stderr`.
+Some tags are scored deterministically (see `cloning` and `seqqa2`) but most are graded by an LLM judge.
+
+### LLM judge scorers
+
+The judge compares the solver's answer to the reference, accepting semantically
+or numerically equivalent answers, and returns one of `correct` / `incorrect` / `unsure`;
+a `correct` verdict scores 1.0 and everything else (including unparseable or empty judgements)
+scores 0.0. Reported metrics are `accuracy` and `stderr`.
 
 The judge requests **structured output** (a typed `result` / `rationale`
 schema), so the verdict is read from a typed field rather than scraped from
@@ -131,22 +145,6 @@ correct when it recovers the expected reference values; and the figure, table,
 and supplement tags (`figqa2*`, `tableqa2*`, `suppqa2`) use an exact-match
 variant for numeric answers.
 
-The `cloning` tag is not graded by an LLM judge: it is scored deterministically
-by labbench2's reward pipeline, which parses the submitted protocol, executes it
-(including PCR simulation), and compares the result to the reference assembly via
-sequence-similarity and restriction-digest checks.
-PCR simulation runs a small Go binary that labbench2 compiles on first use, so a
-Go toolchain (1.21+) must be available on the host the first time you score
-`cloning`; the compiled binary is then cached inside the installed package and
-reused. To install Go: `brew install go` (macOS), `sudo apt install golang-go` (Linux),
-or <https://go.dev/dl/>. Without Go, protocol execution fails gracefully: PCR-based
-samples score 0.0 with an explanatory reason rather than crashing the run.
-
-The `seqqa2` tag is also scored deterministically. A
-per-question validator (selected by the question's `type`) checks the answer
-extracted via that question's `answer_regex`; extraction tolerates line-wrapped
-or whitespace-separated sequences.
-
 The judge model is selected via the `grader` model role and defaults to
 `anthropic/claude-sonnet-4-5` at temperature 0. Override it on the command line,
 for example:
@@ -156,6 +154,21 @@ uv run inspect eval lab_bench_2/lab_bench_2 \
   --model openai/gpt-5-nano \
   --model-role grader=anthropic/claude-opus-4-1-20250805
 ```
+
+### Deterministic scorers
+
+The `cloning` tag is not graded by an LLM judge: it is scored deterministically
+by labbench2's reward pipeline, which parses the submitted protocol, executes it
+(including Polymerase Chain Reaction simulation), and compares the result to the
+reference assembly via sequence-similarity and restriction-digest checks.
+PCR simulation requires that Go be available on the host. Without Go,
+protocol execution fails gracefully: PCR-based samples score 0.0 with an explanatory
+reason rather than crashing the run.
+
+The `seqqa2` tag is also scored deterministically. A
+per-question validator (selected by the question's `type`) checks the answer
+extracted via that question's `answer_regex`; extraction tolerates line-wrapped
+or whitespace-separated sequences.
 
 ## Attribution
 
