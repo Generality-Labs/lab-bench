@@ -7,8 +7,18 @@ on:
     branches:
       - main
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+# SECURITY: No checkout, no API calls; reads PR body via env only.
+# zizmor: excessive-permissions (https://docs.zizmor.sh/audits/#excessive-permissions)
+permissions: {}
+
 jobs:
   check-pr-template:
+    name: Check PR template
+    if: github.actor != 'dependabot[bot]'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
@@ -28,7 +38,7 @@ jobs:
         run: |
           # Each required checklist item (substring that must appear in the PR body)
           required_items=(
-            "Are you adding a new eval?"
+            "Are you listing new eval(s) in the register?"
             "Does this change affect existing eval(s)?"
             "Does this change affect how future contributors"
           )

@@ -26,7 +26,20 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+<<<<<<< /tmp/sync_out
 import yaml
+=======
+from pydantic import HttpUrl
+
+from inspect_evals.constants import INSPECT_EVALS_CACHE_PATH
+from inspect_evals.metadata import (
+    EvaluationReport,
+    EvaluationReportResult,
+    ExternalEvalMetadata,
+    InternalEvalMetadata,
+    load_listing,
+)
+>>>>>>> /tmp/sync_theirs
 
 log_level = os.getenv("LOG_LEVEL", "INFO")
 logging.basicConfig(level=getattr(logging, log_level, logging.INFO))
@@ -36,6 +49,22 @@ CONTRIBUTORS_KEY = "Contributors: Automatically Generated"
 OPTIONS_KEY = "Options: Automatically Generated"
 USAGE_KEY = "Usage: Automatically Generated"
 PARAMETERS_KEY = "Parameters: Automatically Generated"
+<<<<<<< /tmp/sync_out
+=======
+EXTERNAL_BANNER_KEY = "ExternalBanner: Automatically Generated"
+DESCRIPTION_KEY = "Description: Automatically Generated"
+INSPECT_DOCS_LINKS_KEY = "InspectDocsLinks: Automatically Generated"
+EVALUATION_REPORT_KEY = "EvaluationReport: Automatically Generated"
+GROUP_SORT_ORDER = (
+    "Coding",
+    "Assistants",
+    "Cybersecurity",
+    "Safeguards",
+    "Mathematics",
+    "Reasoning",
+    "Knowledge",
+)
+>>>>>>> /tmp/sync_theirs
 
 
 # ---------------------------------------------------------------------------
@@ -77,6 +106,7 @@ def _load_eval_info(yaml_path: Path) -> EvalInfo:
         TaskInfo(name=t["name"], dataset_samples=t.get("dataset_samples", 0))
         for t in data.get("tasks", [])
     ]
+<<<<<<< /tmp/sync_out
     return EvalInfo(
         title=data.get("title", eval_name),
         description=data.get("description", ""),
@@ -90,6 +120,54 @@ def _load_eval_info(yaml_path: Path) -> EvalInfo:
         tags=data.get("tags", []),
     )
 
+=======
+    return links
+
+
+def listing_md(listing: ExternalEvalMetadata | InternalEvalMetadata) -> str:
+    """Generate markdown for a single eval listing using a multiline template."""
+    logger.debug("Form contributor links")
+    contributor_md = ", ".join(contributor_links(listing.contributors))
+    if isinstance(listing, ExternalEvalMetadata):
+        maintainer_md = ", ".join(contributor_links(listing.source.maintainers))
+        credits = (
+            f"Maintained upstream by: {maintainer_md}"
+            f" • Listed in inspect_evals by: {contributor_md}"
+        )
+    else:
+        credits = f"Contributed by: {contributor_md}"
+    contributors_md = f"<sub><sup>{credits}</sub></sup>"
+
+    if isinstance(listing, ExternalEvalMetadata):
+        repo_name = _repo_name(listing.source.repository_url)
+        install_block = (
+            f"  git clone {listing.source.repository_url}\n"
+            f"  cd {repo_name} && git checkout {listing.source.repository_commit}\n"
+            f"  uv sync\n"
+        )
+        tasks_block = install_block + "\n".join(
+            f"  uv run inspect eval {task.task_path}@{task.name}"
+            for task in listing.tasks
+        )
+    else:
+        tasks_block = "\n".join(
+            f"  uv run inspect eval inspect_evals/{task.name}" for task in listing.tasks
+        )
+
+    # Indent each line of the description with 2 spaces for markdown list nesting
+    description_indented = "\n".join(
+        f"  {line}" for line in listing.description.strip().split("\n")
+    )
+
+    title_link = link_md(listing.title.strip(), listing.path)
+    if isinstance(listing, ExternalEvalMetadata):
+        title_link = (
+            "![external](https://img.shields.io/badge/external-orange) " + title_link
+        )
+
+    md_template = f"""\
+- ### {title_link}
+>>>>>>> /tmp/sync_theirs
 
 def discover_evals(src_dir: Path, include_examples: bool = False) -> list[EvalInfo]:
     """Discover all evaluations by scanning src/*/eval.yaml."""
@@ -223,7 +301,292 @@ def build_usage_section(eval_info: EvalInfo) -> list[str]:
         f"uv run inspect eval {t} --model openai/gpt-5-nano" for t in formatted_tasks
     )
 
+<<<<<<< /tmp/sync_out
     python_commands = ", ".join(t.name for t in eval_info.tasks)
+=======
+
+def build_external_banner_section(task_metadata: ExternalEvalMetadata) -> list[str]:
+    src = task_metadata.source
+    slug = _repo_slug(src.repository_url)
+    short_sha = src.repository_commit[:7]
+    commit_url = f"{str(src.repository_url).rstrip('/')}/tree/{src.repository_commit}"
+    contributors_md = ", ".join(contributor_links(task_metadata.contributors))
+    return [
+        "> ⚠️ **External evaluation.** Code lives in an upstream repository. inspect_evals lists it for discoverability; review the upstream repo and pinned commit before running.",
+        "",
+        f"**Source:** [`{slug}@{short_sha}`]({commit_url}) · Listed by {contributors_md}",
+    ]
+
+
+def build_description_section(
+    task_metadata: ExternalEvalMetadata | InternalEvalMetadata,
+) -> list[str]:
+    return task_metadata.description.strip().split("\n")
+
+
+def build_inspect_docs_links_section(
+    _task_metadata: ExternalEvalMetadata | InternalEvalMetadata,
+) -> list[str]:
+    return [
+        "**More command-line options:** [Inspect docs ↗](https://inspect.aisi.org.uk/options.html)"
+    ]
+
+
+_STANDARD_BEFORE_METRICS: tuple[str, ...] = ("model", "provider")
+_STANDARD_AFTER_METRICS: tuple[str, ...] = ("time", "date")
+
+
+def _humanize_field_name(name: str) -> str:
+    return " ".join(part.capitalize() for part in name.replace("-", "_").split("_"))
+
+
+def _format_report_cell(value: Any) -> str:
+    if value is None:
+        return ""
+    if isinstance(value, bool):
+        return str(value)
+    if isinstance(value, float):
+        return f"{value:.3f}"
+    return str(value)
+
+
+def _report_columns(
+    results: list[EvaluationReportResult],
+) -> tuple[list[str], list[str], list[str]]:
+    """Return ``(before_metrics, metric_keys, after_metrics)`` columns.
+
+    Static columns are included only when at least one row has them set
+    (``model`` is always included). ``metric_keys`` is the unique
+    ``metrics[*].key`` values across all rows, in first-seen order, and
+    sits between the descriptor columns (model/provider) and the
+    run-info columns (time/date).
+    """
+
+    def _present(field: str) -> bool:
+        return field == "model" or any(getattr(r, field) is not None for r in results)
+
+    before = [f for f in _STANDARD_BEFORE_METRICS if _present(f)]
+    after = [f for f in _STANDARD_AFTER_METRICS if _present(f)]
+    metric_keys: list[str] = []
+    seen: set[str] = set()
+    for r in results:
+        for m in r.metrics:
+            if m.key not in seen:
+                metric_keys.append(m.key)
+                seen.add(m.key)
+    return before, metric_keys, after
+
+
+def _row_cell(result: EvaluationReportResult, column: str, *, is_metric: bool) -> Any:
+    if is_metric:
+        return next((m.value for m in result.metrics if m.key == column), None)
+    return getattr(result, column, None)
+
+
+def _render_results_table(results: list[EvaluationReportResult]) -> list[str]:
+    before, metric_cols, after = _report_columns(results)
+    columns = before + metric_cols + after
+    is_metric = [False] * len(before) + [True] * len(metric_cols) + [False] * len(after)
+    headers = [_humanize_field_name(c) for c in columns]
+    rows = [
+        [
+            _format_report_cell(_row_cell(r, c, is_metric=m))
+            for c, m in zip(columns, is_metric)
+        ]
+        for r in results
+    ]
+    widths = [
+        max(len(headers[i]), 3, *(len(row[i]) for row in rows))
+        for i in range(len(columns))
+    ]
+
+    def fmt_row(cells: list[str]) -> str:
+        return "| " + " | ".join(c.ljust(w) for c, w in zip(cells, widths)) + " |"
+
+    return [
+        fmt_row(headers),
+        "| " + " | ".join("-" * w for w in widths) + " |",
+        *(fmt_row(row) for row in rows),
+    ]
+
+
+def _group_results_by_task(
+    results: list[EvaluationReportResult],
+) -> dict[str | None, list[EvaluationReportResult]]:
+    groups: dict[str | None, list[EvaluationReportResult]] = {}
+    for r in results:
+        groups.setdefault(r.task, []).append(r)
+    return groups
+
+
+def build_evaluation_report_section(task_metadata: ExternalEvalMetadata) -> list[str]:
+    """Render the evaluation report block from ``eval.yaml``.
+
+    Returns an empty list when no report is set.
+    """
+    report: EvaluationReport | None = task_metadata.evaluation_report
+    if report is None or not report.results:
+        return []
+
+    groups = _group_results_by_task(report.results)
+    grouped_render = not (len(groups) == 1 and None in groups)
+
+    table_blocks: list[str] = []
+    for task_name, rows in groups.items():
+        if grouped_render:
+            heading = task_name if task_name is not None else "Overall"
+            table_blocks.append(f"### {heading}")
+            table_blocks.append("")
+        table_blocks.extend(_render_results_table(rows))
+        table_blocks.append("")
+    while table_blocks and table_blocks[-1] == "":
+        table_blocks.pop()
+
+    repo_url = str(task_metadata.source.repository_url).rstrip("/")
+    commit_url = f"{repo_url}/tree/{report.commit}"
+    commit_md = f"**Commit:** [`{report.commit[:7]}`]({commit_url})"
+
+    parts: list[str] = ["## Evaluation Report", ""]
+    if report.timestamp:
+        parts.append(f"**Timestamp:** {report.timestamp}")
+        parts.append("")
+    parts.append(commit_md)
+    if report.version:
+        parts.append(f"**Version:** {report.version}")
+    parts.append("")
+    if report.command:
+        parts.append("```bash")
+        parts.append(report.command)
+        parts.append("```")
+        parts.append("")
+    parts.extend(table_blocks)
+    if report.notes:
+        parts.append("")
+        parts.append("**Notes:**")
+        parts.append("")
+        parts.extend(f"- {n}" for n in report.notes)
+    return parts
+
+
+def _import_path_from_task_path(task_path: str) -> str:
+    """Derive a Python import path from a task file path (src-layout heuristic)."""
+    p = task_path.removesuffix(".py").lstrip("./")
+    p = p.removeprefix("src/")
+    return p.replace("/", ".")
+
+
+def build_external_usage_section(task_metadata: ExternalEvalMetadata) -> list[str]:
+    src = task_metadata.source
+    repo_dir = _repo_name(src.repository_url)
+    slug = _repo_slug(src.repository_url)
+    first = task_metadata.tasks[0]
+    model = DEFAULT_EXAMPLE_MODEL
+
+    cli_single = f"uv run inspect eval {first.task_path}@{first.name} --model {model}"
+
+    import_path = _import_path_from_task_path(first.task_path or "")
+    py_eval = (
+        "from inspect_ai import eval\n"
+        f"from {import_path} import {first.name}\n\n"
+        f'eval({first.name}(), model="{model}")'
+    )
+
+    rendered = f"""## Usage
+
+### Installation
+
+This is an externally-maintained evaluation. Clone the upstream repository at the pinned commit and install its dependencies:
+
+```bash
+git clone {src.repository_url}
+cd {repo_dir}
+git checkout {src.repository_commit}
+uv sync
+```
+
+### Running evaluations
+
+#### CLI
+
+```bash
+{cli_single}
+```
+
+#### Python
+
+```python
+{py_eval}
+```
+
+### View logs
+
+```bash
+uv run inspect view
+```
+
+### More information
+
+For the dataset, scorer, task parameters, and validation, see the upstream repo: [{slug}]({src.repository_url})."""
+    return rendered.split("\n")
+
+
+def build_usage_section(
+    task_metadata: ExternalEvalMetadata | InternalEvalMetadata,
+) -> list[str]:
+    if isinstance(task_metadata, ExternalEvalMetadata):
+        return build_external_usage_section(task_metadata)
+
+    extra = task_metadata.dependency
+    dependency_group = task_metadata.dependency_group
+
+    # Build pip install command
+    pip_install_cmd = (
+        f"pip install inspect-evals[{extra}]" if extra else "pip install inspect-evals"
+    )
+
+    # Build uv sync command
+    if extra and dependency_group:
+        uv_sync_cmd = f"uv sync --extra {extra}  --group {dependency_group}"
+    elif extra:
+        uv_sync_cmd = f"uv sync --extra {extra}"
+    elif dependency_group:
+        uv_sync_cmd = f"uv sync --group {dependency_group}"
+    else:
+        uv_sync_cmd = "uv sync"
+
+    # Build dependency group note if needed
+    dependency_group_note = ""
+    if dependency_group:
+        dependency_group_note = (
+            "\nNote the `--group` flag. The vast majority of our evals use "
+            "`uv sync` with `--extra`. This eval has a dependency on a git URL, "
+            "so it's managed differently.\n"
+        )
+
+    formatted_tasks = [f"inspect_evals/{task.name}" for task in task_metadata.tasks]
+
+    py_import_path = (
+        task_metadata.path[4:].replace("/", ".")
+        if task_metadata.path.startswith("src/")
+        else None
+    )
+
+    python_commands = ", ".join(t.name for t in task_metadata.tasks)
+
+    bash_tasks = _bash_run_tasks(task_metadata, "inspect_evals")
+
+    multi_msg = ""
+    maybe_eval_set = ""
+    maybe_eval_set_call = ""
+
+    if len(formatted_tasks) > 1:
+        multi_msg = (  # TODO: fix spelling error in "simultaneously"
+            "\nTo run multiple tasks simulteneously use `inspect eval-set`:\n\n"
+            f"```bash\nuv run inspect eval-set {' '.join(formatted_tasks)}\n```\n"
+        )
+        maybe_eval_set = ", eval_set"
+        maybe_eval_set_call = f"\neval_set([{python_commands}], log_dir='logs-run-42')"
+>>>>>>> /tmp/sync_theirs
 
     template = textwrap.dedent("""\
         ## Usage
@@ -333,6 +696,7 @@ def _clean_type_string(type_str: str) -> str:
     # Remove inspect_ai internal module paths
     type_str = type_str.replace("inspect_ai.model._model.", "")
     type_str = type_str.replace("inspect_ai.solver._solver.", "")
+    type_str = type_str.replace("inspect_ai.agent._agent.", "")
     type_str = type_str.replace("inspect_ai.scorer._scorer.", "")
     type_str = type_str.replace("inspect_ai.util._sandbox.environment.", "")
     type_str = type_str.replace("inspect_ai.dataset._dataset.", "inspect_ai.dataset.")
@@ -524,8 +888,34 @@ def build_parameters_section(eval_info: EvalInfo) -> list[str]:
 # ---------------------------------------------------------------------------
 
 
+<<<<<<< /tmp/sync_out
 def generate_basic_readme(eval_info: EvalInfo) -> list[str]:
     """Generate basic README content for a new eval."""
+=======
+def readme_dir(eval_metadata: ExternalEvalMetadata | InternalEvalMetadata) -> str:
+    """On-disk directory for an eval's README, relative to repo root."""
+    if isinstance(eval_metadata, ExternalEvalMetadata):
+        return f"register/{eval_metadata.id}"
+    return eval_metadata.path
+
+
+def generate_basic_readme(
+    listing: ExternalEvalMetadata | InternalEvalMetadata,
+) -> list[str]:
+    """Generate basic README content for an eval.
+
+    Args:
+        listing: Eval metadata from eval.yaml
+
+    Returns:
+        List of lines for the minimal README
+    """
+    logger.debug(f"Generating readme content for eval... {listing=}")
+
+    if isinstance(listing, ExternalEvalMetadata):
+        return _generate_external_basic_readme(listing)
+
+>>>>>>> /tmp/sync_theirs
     template = textwrap.dedent(f"""\
         # {eval_info.title}
 
@@ -561,9 +951,77 @@ def generate_basic_readme(eval_info: EvalInfo) -> list[str]:
     return template.strip().split("\n")
 
 
+<<<<<<< /tmp/sync_out
 def readme_exists(eval_info: EvalInfo) -> bool:
     readme_path = Path(__file__).parent.parent / eval_info.path / "README.md"
     return readme_path.exists()
+=======
+def _generate_external_basic_readme(listing: ExternalEvalMetadata) -> list[str]:
+    template = textwrap.dedent(f"""\
+        # {listing.title}
+
+        <!-- {EXTERNAL_BANNER_KEY} -->
+        <!-- /{EXTERNAL_BANNER_KEY} -->
+
+        <!-- {DESCRIPTION_KEY} -->
+        <!-- /{DESCRIPTION_KEY} -->
+
+        <!-- {USAGE_KEY} -->
+        <!-- /{USAGE_KEY} -->
+
+        <!-- {OPTIONS_KEY} -->
+        <!-- /{OPTIONS_KEY} -->
+
+        <!-- {INSPECT_DOCS_LINKS_KEY} -->
+        <!-- /{INSPECT_DOCS_LINKS_KEY} -->
+
+        <!-- {EVALUATION_REPORT_KEY} -->
+        <!-- /{EVALUATION_REPORT_KEY} -->
+        """)
+    return template.strip().split("\n")
+
+
+def generate_readme(create_missing_readmes: bool = False) -> None:
+    logger.debug("Generating Readme...")
+    # directory configuration
+    readme_path = Path(__file__).parent / "../README.md"
+
+    # Load the listings using the Pydantic model
+    listing = load_listing()
+
+    # Group evaluations by their group field
+    listing_groups: dict[str, list[ExternalEvalMetadata | InternalEvalMetadata]] = {}
+    for eval_metadata in listing.evals:
+        # place the listing in a group
+        if eval_metadata.group not in listing_groups:
+            listing_groups[eval_metadata.group] = []
+        listing_groups[eval_metadata.group].append(eval_metadata)
+
+    # sort the listings within each group by title and path
+    for group in listing_groups:
+        listing_groups[group] = sorted(
+            listing_groups[group], key=lambda x: (x.title, x.path)
+        )
+
+    # sort the groups by specified order
+    # Create a mapping of group name to sort index, with any unlisted groups going to the end
+    sort_index = {name: i for i, name in enumerate(GROUP_SORT_ORDER)}
+    listing_groups = dict(
+        sorted(
+            listing_groups.items(),
+            key=lambda x: sort_index.get(x[0], len(GROUP_SORT_ORDER)),
+        )
+    )
+
+    # generate the markdown
+    content: list[str] = []
+    for group, listings in listing_groups.items():
+        content.append(f"## {group}")
+        content.append("")
+        for eval_metadata in listings:
+            content.append(listing_md(eval_metadata))
+            content.append("")
+>>>>>>> /tmp/sync_theirs
 
 
 # ---------------------------------------------------------------------------
@@ -578,6 +1036,7 @@ def generate_readmes(
 ) -> None:
     """Generate/update README sections for all discovered evals.
 
+<<<<<<< /tmp/sync_out
     Args:
         eval_filter: If set, only process this eval (package name, e.g. "my_eval"
             or "examples.gpqa").
@@ -609,6 +1068,45 @@ def generate_readmes(
 
         if not readme_exists(eval_info):
             print("  Skipping (no README.md)")
+=======
+        if create_missing_readmes and not readme_exists(eval_readme_dir):
+            readme_path_eval = (
+                Path(__file__).parent.parent / eval_readme_dir / "README.md"
+            )
+            readme_path_eval.parent.mkdir(parents=True, exist_ok=True)
+            minimal_content = generate_basic_readme(eval_metadata)
+            with open(readme_path_eval, "w", encoding="utf-8") as readme_file:
+                readme_file.write("\n".join(minimal_content))
+            logger.info(f"Created README for {eval_readme_dir}")
+
+        if isinstance(eval_metadata, ExternalEvalMetadata):
+            rewrite_task_readme(
+                eval_readme_dir,
+                EXTERNAL_BANNER_KEY,
+                build_external_banner_section(eval_metadata),
+            )
+            rewrite_task_readme(
+                eval_readme_dir,
+                DESCRIPTION_KEY,
+                build_description_section(eval_metadata),
+            )
+            rewrite_task_readme(
+                eval_readme_dir, USAGE_KEY, build_usage_section(eval_metadata)
+            )
+            rewrite_task_readme(
+                eval_readme_dir, OPTIONS_KEY, build_options_section(eval_metadata)
+            )
+            rewrite_task_readme(
+                eval_readme_dir,
+                INSPECT_DOCS_LINKS_KEY,
+                build_inspect_docs_links_section(eval_metadata),
+            )
+            rewrite_task_readme(
+                eval_readme_dir,
+                EVALUATION_REPORT_KEY,
+                build_evaluation_report_section(eval_metadata),
+            )
+>>>>>>> /tmp/sync_theirs
             continue
 
         rewrite_task_readme(
