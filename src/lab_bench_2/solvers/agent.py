@@ -4,6 +4,8 @@ Wraps basic_agent with a message-limit-aware final-warning prompt that
 forces the agent to submit before running out of time.
 """
 
+import logging
+from pathlib import Path
 from textwrap import dedent
 from typing import Any
 
@@ -13,10 +15,11 @@ from inspect_ai.solver import (
     Solver,
     TaskState,
     basic_agent,
+    chain,
     solver,
     system_message,
 )
-from inspect_ai.util import LimitExceededError
+from inspect_ai.util import LimitExceededError, sandbox
 
 from lab_bench_2.file_downloader import list_files
 from lab_bench_2.solvers.sandbox_tools import sandbox_tools, web_search_available
@@ -68,26 +71,56 @@ FINAL_WARNING_MESSAGE = dedent("""\
     tool to submit your single best answer. Do NOT run any more
     code — just submit your best guess immediately.""")
 
+logger = logging.getLogger(__name__)
+
+
+@solver
+def copy_files_to_sandbox() -> Solver:
+    """Copy a question's downloaded files into the sandbox working directory.
+
+    Reads the files cached at ``metadata["files_path"]`` (set by the dataset
+    loader for file-bearing tags) and writes each into the sandbox cwd so the
+    agent can inspect them with ``python``/``bash``. A no-op for file-less tags
+    (e.g. litqa3), where no ``files_path`` is set.
+    """
+
+    async def solve(state: TaskState, generate: Generate) -> TaskState:
+        files_path = state.metadata.get("files_path")
+        if not files_path:
+            return state
+        env = sandbox()
+        for file in list_files(Path(files_path)):
+            logger.debug(f"Copying file into the sandbox: {file.name}")
+            await env.write_file(file.name, file.read_bytes())
+        return state
+
+    return solve
+
 
 @solver
 def agentic() -> Solver:
     """The benchmark's client-side agentic configuration.
 
-    Runs an agent with sandboxed ``python``/``bash`` (and, when an external
-    provider key is set, ``web_search``) tools, wrapped in the final-warning
-    mechanism that forces a ``submit`` before the turn budget is exhausted.
-    Requires a Docker sandbox, which the task attaches for ``solver="agentic"``.
+    Copies any question files into the sandbox, then runs an agent with
+    sandboxed ``python``/``bash`` (and, when an external provider key is set,
+    ``web_search``) tools, wrapped in the final-warning mechanism that forces a
+    ``submit`` before the turn budget is exhausted. Requires a Docker sandbox,
+    which the task attaches for ``solver="agentic"``.
     """
     # Each agent turn produces ~2 messages (assistant + tool result), plus
     # system and initial user message. Translate turns to message count.
     message_limit = DEFAULT_AGENTIC_MAX_TURNS * 2 + 2
-    return agent_with_final_warning(
+
+    return chain(
+        copy_files_to_sandbox(),
+        agent_with_final_warning(
             warning_limit=message_limit,
             init=system_message(
                 build_sandbox_prompt(web_search=web_search_available())
             ),
             tools=sandbox_tools(),
             continue_message=CONTINUE_MESSAGE,
+        ),
     )
 
 

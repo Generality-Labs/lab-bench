@@ -1,14 +1,19 @@
-from typing import Any
+from pathlib import Path
+from typing import Any, cast
+from unittest.mock import AsyncMock, MagicMock
 
+import pytest
 from inspect_ai import Task, eval
 from inspect_ai.dataset import Sample
-from inspect_ai.model import ChatMessage, ModelOutput, get_model
-from inspect_ai.solver import Solver
+from inspect_ai.model import ChatMessage, ModelName, ModelOutput, get_model
+from inspect_ai.solver import Generate, Solver, TaskState
 
+import lab_bench_2.solvers.agent as agent_module
 from lab_bench_2.solvers.agent import (
     FINAL_WARNING_MESSAGE,
     agent_with_final_warning,
     agentic,
+    copy_files_to_sandbox,
 )
 
 
@@ -95,3 +100,48 @@ def test_recovers_dangling_submit_when_interrupted_mid_tool_call() -> None:
     # and recovery came from resolving the dangling call, not from the
     # final-warning fallback (which is never injected in this path)
     assert all(FINAL_WARNING_MESSAGE not in m.text for m in sample.messages)
+
+
+class TestCopyFilesToSandbox:
+    async def test_writes_each_question_file_into_the_sandbox(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        # given a question whose files are cached locally
+        (tmp_path / "seq.fasta").write_text(">a\nACGT\n")
+        (tmp_path / "data.csv").write_text("x,y\n1,2\n")
+        fake_env = MagicMock()
+        fake_env.write_file = AsyncMock()
+        monkeypatch.setattr(agent_module, "sandbox", lambda *a, **k: fake_env)
+        state = TaskState(
+            model=ModelName("mockllm/model"),
+            sample_id="files",
+            epoch=0,
+            input="q",
+            messages=[],
+            metadata={"files_path": str(tmp_path)},
+        )
+        # when
+        await copy_files_to_sandbox()(state, cast(Generate, AsyncMock()))
+        # then each file is written into the sandbox cwd by basename
+        written = {call.args[0] for call in fake_env.write_file.await_args_list}
+        assert written == {"seq.fasta", "data.csv"}
+
+    async def test_is_noop_without_files_path(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        # given a question with no files (no files_path in metadata)
+        fake_env = MagicMock()
+        fake_env.write_file = AsyncMock()
+        monkeypatch.setattr(agent_module, "sandbox", lambda *a, **k: fake_env)
+        state = TaskState(
+            model=ModelName("mockllm/model"),
+            sample_id="no-files",
+            epoch=0,
+            input="q",
+            messages=[],
+            metadata={},
+        )
+        # when
+        await copy_files_to_sandbox()(state, cast(Generate, AsyncMock()))
+        # then nothing is written to the sandbox
+        fake_env.write_file.assert_not_awaited()
