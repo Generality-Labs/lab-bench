@@ -1,17 +1,13 @@
-"""Solvers for the LAB-Bench 2 evaluation.
+"""Solver factories for the LAB-Bench 2 evaluation.
 
 The reference benchmark runs each model in two configurations: `bare` (no tools,
-single-turn) and an agentic configuration with provider-native tools.
+single-turn) and an agentic configuration with provider-native, server-side tools.
 """
 
 from __future__ import annotations
 
-from typing import Literal
-
 from inspect_ai.solver import Solver, chain, generate, solver, use_tools
 from inspect_ai.tool import Tool, code_execution, web_search
-
-SolverType = Literal["bare", "tools"]
 
 
 @solver
@@ -52,20 +48,3 @@ def tools() -> Solver:
         use_tools(native_tools()),
         generate(tool_calls="loop"),
     )
-
-
-SOLVERS_BY_TYPE = {
-    "bare": bare,
-    "tools": tools,
-}
-
-
-def solver_for_type(solver_type: SolverType) -> Solver:
-    """Return the solver for a type, or raise if the type is not yet implemented."""
-    factory = SOLVERS_BY_TYPE.get(solver_type)
-    if factory is None:
-        raise NotImplementedError(
-            f"No solver implemented for type={solver_type!r}; "
-            f"supported types: {sorted(SOLVERS_BY_TYPE)}."
-        )
-    return factory()

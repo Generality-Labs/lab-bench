@@ -1,7 +1,7 @@
 from inspect_ai.solver import Solver
 from inspect_ai.tool import Tool, ToolDef
 
-from lab_bench_2.solvers import bare, native_tools, tools
+from lab_bench_2.solvers.solvers import bare, native_tools, tools
 
 
 def test_bare_returns_solver() -> None:
