@@ -73,12 +73,12 @@ See `uv run inspect eval --help` for all available options.
 
 - `tag` (str): Which LAB-Bench 2 subset to run. Supported tags: ``cloning``, ``dbqa2``, ``figqa2`` (and ``figqa2-img`` / ``figqa2-pdf``), ``litqa3``, ``patentqa``, ``protocolqa2``, ``seqqa2``, ``sourcequality``, ``suppqa2``, ``tableqa2`` (and ``tableqa2-img`` / ``tableqa2-pdf``), ``trialqa``. (default: `'litqa3'`)
 - `mode` (Mode): How a question's data files are delivered to the model. A no-op for tags without files (such as litqa3). Options: ``file``: Files uploaded via API. PDFs/images attached as context; other files as document attachments., ``inject``: Text file contents concatenated into the prompt as text., ``retrieve``: Only file names/stems are given; prompt instructs the agent to retrieve the necessary sequences or data from a source of its choosing. File contents are withheld. (default: `'file'`)
-- `solver` (SolverType): The solver to run. Options: ``bare``: a plain single-turn `generate()`., ``tools``: the server-side agentic configuration. The model is given provider-native, **server-side** tools — WebSearch and CodeExecution — and runs Inspect's tool-use loop (default: `'bare'`)
+- `solver` (SolverType): The solver to run. Options: ``bare``: a plain single-turn `generate()`., ``tools``: the server-side agentic configuration. The model is given provider-native, **server-side** tools — WebSearch and CodeExecution — and runs Inspect's tool-use loop., ``agentic``: the client-side agentic configuration. The model is given ``python``/``bash`` (and, with an external provider key, ``web_search``) tools in a Docker sandbox. (default: `'bare'`)
 <!-- /Parameters: Automatically Generated -->
 
 ## Solvers
 
-The benchmark runs each model in two configurations, selected via the `solver`
+The benchmark can run each model in three configurations, selected via the `solver`
 parameter:
 
 - **`bare`** (default): a plain single-turn `generate()` — no tools.
@@ -87,6 +87,11 @@ parameter:
   tool-use loop, which drives each provider's server-side tool round-trips. The
   internal provider is auto-selected for the active model, so no external search
   keys or local sandbox are required.
+- **`agentic`**: the client-side agentic configuration. The model is given **sandboxed**
+  `python` / `bash` tools (plus `web_search` when an external provider key is set —
+  `TAVILY_API_KEY`, `EXA_API_KEY`, or `GOOGLE_CSE_API_KEY`) inside a **Docker sandbox**,
+  and must call `submit()` to answer. A question's data files are copied into the sandbox
+  working directory.
 
 Reasoning effort is set with Inspect's built-in `--reasoning-effort` flag (it
 applies to the model under test only, not the grader). The paper's "tools,high"
@@ -107,8 +112,10 @@ Revisit if Inspect adds a web-fetch tool.
 
 One consequence: under `solver=tools`, `mode="retrieve"` (where the model is given
 only file names and must obtain the data itself) is degraded, since the model
-cannot reliably fetch a specific record's full content. Prefer `inject` or `file`
-with the agentic configuration.
+cannot reliably fetch a specific record's full content — prefer `inject` or `file`.
+This limitation does not apply to `solver=agentic`: the question's files are copied
+into the sandbox, so `mode="retrieve"` (filenames in the prompt, contents on disk) is
+the recommended pairing there.
 
 ## Dataset
 

@@ -67,9 +67,8 @@ def lab_bench_2(
             is given provider-native, **server-side** tools — WebSearch and
             CodeExecution — and runs Inspect's tool-use loop.
             - ``agentic``: the client-side agentic configuration. The model is
-            given sandboxed ``python``/``bash`` (and, with an external provider
-            key, ``web_search``) tools in a Docker sandbox and must ``submit``
-            an answer. Requires Docker.
+            given ``python``/``bash`` (and, with an external provider
+            key, ``web_search``) tools in a Docker sandbox.
     """
     if tag not in SUPPORTED_TAGS:
         raise NotImplementedError(
