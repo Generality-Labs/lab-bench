@@ -12,7 +12,7 @@ from inspect_ai import Task, task
 from lab_bench_2.dataset import load_lab_bench_2_dataset
 from lab_bench_2.prompt_composer import Mode
 from lab_bench_2.scorers import scorer_for_tag
-from lab_bench_2.solvers import SolverType, solver_for_type
+from lab_bench_2.solvers import SolverType, sandbox_for_solver, solver_for_type
 from utils.metadata import load_version_from_yaml
 
 SUPPORTED_TAGS = (
@@ -65,7 +65,11 @@ def lab_bench_2(
             - ``bare``: a plain single-turn `generate()`.
             - ``tools``: the server-side agentic configuration. The model
             is given provider-native, **server-side** tools — WebSearch and
-            CodeExecution — and runs Inspect's tool-use loop
+            CodeExecution — and runs Inspect's tool-use loop.
+            - ``agentic``: the client-side agentic configuration. The model is
+            given sandboxed ``python``/``bash`` (and, with an external provider
+            key, ``web_search``) tools in a Docker sandbox and must ``submit``
+            an answer. Requires Docker.
     """
     if tag not in SUPPORTED_TAGS:
         raise NotImplementedError(
@@ -75,5 +79,6 @@ def lab_bench_2(
         dataset=load_lab_bench_2_dataset(tag=tag, mode=mode),
         solver=solver_for_type(solver),
         scorer=scorer_for_tag(tag),
+        sandbox=sandbox_for_solver(solver),
         version=EVAL_VERSION,
     )

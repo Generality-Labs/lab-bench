@@ -8,19 +8,87 @@ from textwrap import dedent
 from typing import Any
 
 from inspect_ai.model import ChatMessageTool, ChatMessageUser, execute_tools, get_model
-from inspect_ai.solver import Generate, Solver, TaskState, basic_agent, solver
+from inspect_ai.solver import (
+    Generate,
+    Solver,
+    TaskState,
+    basic_agent,
+    solver,
+    system_message,
+)
 from inspect_ai.util import LimitExceededError
 
-RETRY_MESSAGE = dedent("""\
-    Your last python() call was empty or malformed.
-    Think step-by-step (<=2 lines) **then** emit a python(code: str) call for the SAME question.
-    If the code would be >2000 chars, write it to sequence.json first and import from there.""")
+from lab_bench_2.file_downloader import list_files
+from lab_bench_2.solvers.sandbox_tools import sandbox_tools, web_search_available
+
+# Each agent turn is roughly one model generation plus one tool execution
+# (~2 messages); the +2 covers the system and initial user messages.
+DEFAULT_AGENTIC_MAX_TURNS = 80
+
+
+def build_sandbox_prompt(web_search: bool) -> str:
+    """System prompt for the agentic sandbox.
+
+    The available-tools sentence reflects whether a ``web_search`` tool is
+    actually present (it is only added when an external provider key is set), so
+    the model is never told about a tool it does not have.
+    """
+    tools_clause = (
+        "Python, Bash, and Web Search tools" if web_search else "Python and Bash tools"
+    )
+    return dedent(f"""\
+    You are a helpful assistant completing a scientific research task. You have \
+access to {tools_clause} in a sandboxed environment. The \
+following Python libraries are pre-installed: biopython, pydna, primer3-py, \
+pandas, numpy, scipy.
+
+    Any files related to the question are in your working directory. Start by \
+running `ls` to see what is available, then use Python or Bash to read and \
+analyze them. Use Python when computational analysis would help answer the \
+question. Before taking an action, briefly describe your reasoning.
+
+    The environment is non-interactive — imports and variables do not persist \
+between calls. Each code execution is independent. If you need to work with long \
+sequences, save them to a file and load from that file in subsequent calls.
+
+    When you have your final answer, call the submit() tool. Be specific and \
+precise — provide exact numerical values, sequences, or lists as requested. For \
+numeric answers, provide the number without units unless specifically asked.
+
+    PLEASE BE CONCISE WITH YOUR OUTPUT AND CODE.""")
+
+
+CONTINUE_MESSAGE = dedent("""\
+    You did not call a tool. Think step-by-step (<=2 lines), then either call a \
+tool to make progress on the question, or call submit() with your final answer.""")
 
 FINAL_WARNING_MESSAGE = dedent("""\
     You are running out of time and MUST submit your answer NOW.
     Based on everything you have learned so far, use the submit()
     tool to submit your single best answer. Do NOT run any more
     code — just submit your best guess immediately.""")
+
+
+@solver
+def agentic() -> Solver:
+    """The benchmark's client-side agentic configuration.
+
+    Runs an agent with sandboxed ``python``/``bash`` (and, when an external
+    provider key is set, ``web_search``) tools, wrapped in the final-warning
+    mechanism that forces a ``submit`` before the turn budget is exhausted.
+    Requires a Docker sandbox, which the task attaches for ``solver="agentic"``.
+    """
+    # Each agent turn produces ~2 messages (assistant + tool result), plus
+    # system and initial user message. Translate turns to message count.
+    message_limit = DEFAULT_AGENTIC_MAX_TURNS * 2 + 2
+    return agent_with_final_warning(
+            warning_limit=message_limit,
+            init=system_message(
+                build_sandbox_prompt(web_search=web_search_available())
+            ),
+            tools=sandbox_tools(),
+            continue_message=CONTINUE_MESSAGE,
+    )
 
 
 @solver
@@ -42,9 +110,11 @@ def agent_with_final_warning(
         except LimitExceededError:
             pass  # Agent hit message limit without submitting — expected
 
-        # Bump limit generously: room for dangling-tool resolution (2),
-        # final-warning user message (1), model response (1), and tool
-        # execution results (2).
+        # basic_agent set the sample message_limit to warning_limit, and the
+        # agent just ran up against it — so the limit must be raised here or the
+        # final-warning generate below would immediately re-trip it. Allow room
+        # for dangling-tool resolution (2), the final-warning user message (1),
+        # the model response (1), and its tool execution results (2).
         state.message_limit = len(state.messages) + 6
 
         # Resolve any dangling tool calls from the interrupted agent.
