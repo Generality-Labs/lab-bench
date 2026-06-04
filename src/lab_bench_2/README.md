@@ -91,7 +91,7 @@ parameter:
   `python` / `bash` tools (plus `web_search` when an external provider key is set —
   `TAVILY_API_KEY`, `EXA_API_KEY`, or `GOOGLE_CSE_API_KEY`) inside a **Docker sandbox**,
   and must call `submit()` to answer. A question's data files are copied into the sandbox
-  working directory.
+  working directory. The initial docker image build should take ~ 2 minutes on a standard personal computer.
 
 Reasoning effort is set with Inspect's built-in `--reasoning-effort` flag (it
 applies to the model under test only, not the grader). The paper's "tools,high"
@@ -152,16 +152,16 @@ Not every sample is compatible with each mode of data uploading; if incompatible
 Each sample in the dataset contains flags for compatible modes - this may change and sample counts
 can be verified by running with the configuration you intend before drawing conclusions from sample counts.
 
-For most tags, those that uses files requires the `file` mode. For example;
+For most tags, those that use files requires the `file` mode. For example;
 
 `uv run inspect eval lab_bench_2 -T tag=sourcequality -T mode=retrieve`
 
- Will result in no samples being loaded in. This is also true for tags protocolqa2`,`sourcequality`,`figqa2-img`,`figqa2-pdf`,`tableqa2-img`,`tableqa2-pdf`.
+ Will result in no samples being loaded in. This is also true for tags `protocolqa2`,`sourcequality`,`figqa2-img`,`figqa2-pdf`,`tableqa2-img`,`tableqa2-pdf`.
 
 Note that the base `figqa2`, `tableqa2`, and `suppqa2` tags have no files (mode is a no-op). Their image/PDF variants do have files and are impacted by the above.
 
 `seqqa2` is the exception: all of its samples are compatible with `file` and `inject`, while only a
-subset of this tag can be used with`retrieve` (so `mode="retrieve"` loads fewer samples).
+subset of this tag can be used with `retrieve` (so `mode="retrieve"` loads fewer samples).
 
 ## Scoring
 
