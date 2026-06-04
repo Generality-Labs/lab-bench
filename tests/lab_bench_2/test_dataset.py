@@ -3,13 +3,16 @@ from typing import Any
 
 import pytest
 from evals.models import LabBenchQuestion
+from inspect_ai.dataset import Sample
 from inspect_ai.model import ChatMessageUser, ContentDocument, ContentImage, ContentText
 
+from lab_bench_2 import dataset as dataset_module
 from lab_bench_2 import file_downloader
 from lab_bench_2.dataset import (
     LAB_BENCH_2_DATASET_PATH,
     LAB_BENCH_2_DATASET_REVISION,
     _question_supports_mode,
+    load_multi_tags_dataset,
     parse_validator_params,
     record_to_sample,
 )
@@ -249,6 +252,46 @@ class TestFileModeIntegration:
         assert sut is not None
         assert sut.metadata is not None
         assert "difficulty" not in sut.metadata
+
+
+class TestLoadAllTagsDataset:
+    def test_concatenates_tags_and_preserves_tag_metadata(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        # given a per-tag loader stubbed to avoid network
+        def fake_loader(tag: str, mode: str = "file") -> list[Sample]:
+            return [Sample(input="q", target="a", id=f"{tag}-1", metadata={"tag": tag})]
+
+        monkeypatch.setattr(dataset_module, "load_lab_bench_2_dataset", fake_loader)
+
+        # when loading several tags as one dataset
+        sut = load_multi_tags_dataset(["litqa3", "cloning"], mode="file")
+
+        # then samples are concatenated in tag order, each keeping its tag
+        samples = list(sut)
+        assert sut.name == "lab_bench_2_all"
+        assert [s.metadata["tag"] for s in samples if s.metadata] == [
+            "litqa3",
+            "cloning",
+        ]
+
+    def test_forwards_mode_to_per_tag_loader(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        # given a loader that records the mode it was called with
+        seen: list[str] = []
+
+        def fake_loader(tag: str, mode: str = "file") -> list[Sample]:
+            seen.append(mode)
+            return []
+
+        monkeypatch.setattr(dataset_module, "load_lab_bench_2_dataset", fake_loader)
+
+        # when
+        load_multi_tags_dataset(["litqa3", "cloning"], mode="inject")
+
+        # then the requested mode is forwarded for every tag
+        assert seen == ["inject", "inject"]
 
 
 def _stub_file_downloader(files_dir: Path, monkeypatch: pytest.MonkeyPatch) -> None:

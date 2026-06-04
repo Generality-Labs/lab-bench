@@ -11,11 +11,12 @@ from __future__ import annotations
 import ast
 import json
 import logging
+from collections.abc import Sequence
 from pathlib import Path
 from typing import Any, cast
 
 from evals.models import LabBenchQuestion
-from inspect_ai.dataset import Dataset, Sample, hf_dataset
+from inspect_ai.dataset import Dataset, MemoryDataset, Sample, hf_dataset
 from inspect_ai.model import ChatMessage, ChatMessageUser, Content, ContentText
 
 from lab_bench_2 import attachment_builder, file_downloader, prompt_composer
@@ -112,6 +113,18 @@ def load_lab_bench_2_dataset(
         revision=LAB_BENCH_2_DATASET_REVISION,
         sample_fields=to_samples,
     )
+
+
+def load_multi_tags_dataset(tags: Sequence[str], mode: Mode = "file") -> Dataset:
+    """Load and concatenate tags' samples into one mixed-tag dataset.
+
+    Each tag is loaded at the given ``mode`` via
+    :func:`load_lab_bench_2_dataset` (which drops samples a tag can't serve in
+    that mode), and the samples are concatenated. Each sample keeps its ``tag``
+    metadata, so a grouped scorer can report per-tag and overall.
+    """
+    samples = [sample for tag in tags for sample in load_lab_bench_2_dataset(tag, mode)]
+    return MemoryDataset(samples=samples, name="lab_bench_2_all")
 
 
 def _question_supports_mode(question: LabBenchQuestion, mode: Mode) -> bool:

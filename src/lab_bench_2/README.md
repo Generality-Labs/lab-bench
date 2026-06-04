@@ -71,7 +71,7 @@ See `uv run inspect eval --help` for all available options.
 
 ### `lab_bench_2`
 
-- `tag` (str): Which LAB-Bench 2 subset to run. Supported tags: ``cloning``, ``dbqa2``, ``figqa2`` (and ``figqa2-img`` / ``figqa2-pdf``), ``litqa3``, ``patentqa``, ``protocolqa2``, ``seqqa2``, ``sourcequality``, ``suppqa2``, ``tableqa2`` (and ``tableqa2-img`` / ``tableqa2-pdf``), ``trialqa``. (default: `'litqa3'`)
+- `tags` (str | list[str] | None): Which LAB-Bench 2 subset(s) to run. Supported tags: ``cloning``, ``dbqa2``, ``figqa2`` (and ``figqa2-img`` / ``figqa2-pdf``), ``litqa3``, ``patentqa``, ``protocolqa2``, ``seqqa2``, ``sourcequality``, ``suppqa2``, ``tableqa2`` (and ``tableqa2-img`` / ``tableqa2-pdf``), ``trialqa``., A single tag (e.g. ``"litqa3"``) runs just that subset and reports one accuracy., A list (e.g. ``["litqa3", "cloning"]``) or ``None`` (the default, meaning every tag) runs the subsets together at the chosen ``mode``, reporting accuracy per tag plus an overall aggregate. (default: `None`)
 - `mode` (Mode): How a question's data files are delivered to the model. A no-op for tags without files (such as litqa3). Options: ``file``: Files uploaded via API. PDFs/images attached as context; other files as document attachments., ``inject``: Text file contents concatenated into the prompt as text., ``retrieve``: Only file names/stems are given; prompt instructs the agent to retrieve the necessary sequences or data from a source of its choosing. File contents are withheld. (default: `'file'`)
 - `solver` (SolverType): The solver to run. Options: ``bare``: a plain single-turn `generate()`., ``tools``: the server-side agentic configuration. The model is given provider-native, **server-side** tools — WebSearch and CodeExecution — and runs Inspect's tool-use loop., ``agentic``: the client-side agentic configuration. The model is given ``python``/``bash`` (and, with an external provider key, ``web_search``) tools in a Docker sandbox. (default: `'bare'`)
 <!-- /Parameters: Automatically Generated -->
@@ -98,7 +98,7 @@ applies to the model under test only, not the grader). The paper's "tools,high"
 case is:
 
 ```bash
-uv run inspect eval lab_bench_2/lab_bench_2 -T tag=litqa3 -T solver=tools --reasoning-effort high
+uv run inspect eval lab_bench_2/lab_bench_2 -T tags=litqa3 -T solver=tools --reasoning-effort high
 ```
 
 ### WebFetch is omitted
@@ -145,6 +145,27 @@ For file-bearing tags, the loader filters out questions that don't opt into
 the requested `mode` (per each question's `QuestionMode` flags in the HF
 data).
 
+#### Selecting one, several, or all tags
+
+The `tags` parameter accepts a single tag, a list of tags, or `None`:
+
+```bash
+# A single tag — one accuracy, scored by that tag's scorer
+uv run inspect eval lab_bench_2 -T tags=litqa3 --model openai/gpt-5-nano
+
+# Several tags — Inspect splits the comma-separated value into a list
+uv run inspect eval lab_bench_2 -T tags=litqa3,cloning --model openai/gpt-5-nano
+
+# Every tag — omit -T tags (defaults to None)
+uv run inspect eval lab_bench_2 --model openai/gpt-5-nano
+```
+
+When more than one tag runs together (a list or the `None` default), accuracy and
+stderr are reported **per tag and overall**: the scorer dispatches each sample to
+its tag's scorer and aggregates with Inspect's `grouped()` metric, keyed on each
+sample's `tag` metadata, which adds an overall `all` row alongside the per-tag
+rows.
+
 #### Relationship between the tag and mode parameters
 
 Tags describe groups of samples/questions whilst mode describes how data files are uploaded.
@@ -154,7 +175,7 @@ can be verified by running with the configuration you intend before drawing conc
 
 For most tags, those that use files requires the `file` mode. For example;
 
-`uv run inspect eval lab_bench_2 -T tag=sourcequality -T mode=retrieve`
+`uv run inspect eval lab_bench_2 -T tags=sourcequality -T mode=retrieve`
 
  Will result in no samples being loaded in. This is also true for tags `protocolqa2`,`sourcequality`,`figqa2-img`,`figqa2-pdf`,`tableqa2-img`,`tableqa2-pdf`.
 
