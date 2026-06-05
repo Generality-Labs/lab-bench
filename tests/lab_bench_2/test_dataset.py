@@ -284,23 +284,31 @@ class TestLoadAllTagsDataset:
     def test_concatenates_tags_and_preserves_tag_metadata(
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        # given a per-tag loader stubbed to avoid network
+        # given a per-tag loader stubbed to avoid network, returning two
+        # samples per tag
         def fake_loader(tag: str, mode: str = "file") -> list[Sample]:
-            return [Sample(input="q", target="a", id=f"{tag}-1", metadata={"tag": tag})]
+            return [
+                Sample(input="q", target="a", id=f"{tag}-{i}", metadata={"tag": tag})
+                for i in range(2)
+            ]
 
         monkeypatch.setattr(dataset_module, "load_lab_bench_2_dataset", fake_loader)
 
         # when loading several tags as one dataset
-        sut = load_multi_tags_dataset(["litqa3", "cloning"], mode="file")
+        requested = ["litqa3", "cloning"]
+        sut = load_multi_tags_dataset(requested, mode="file")
 
-        # then samples are concatenated in tag order, each keeping its tag,
-        # and the dataset name is derived from the (sorted) tag selection
+        # then every requested subset contributes at least one sample (nothing
+        # is silently dropped), each sample keeps its tag, and the dataset name
+        # is derived from the (sorted) tag selection
         samples = list(sut)
         assert sut.name == "lab_bench_2_cloning+litqa3"
-        assert [s.metadata["tag"] for s in samples if s.metadata] == [
-            "litqa3",
-            "cloning",
-        ]
+        loaded_tags = [s.metadata["tag"] for s in samples if s.metadata is not None]
+        for tag in requested:
+            assert loaded_tags.count(tag) == 2, (
+                f"wrong number of samples loaded for tag {tag!r}"
+            )
+        assert len(samples) == 2 * len(requested)
 
     def test_forwards_mode_to_per_tag_loader(
         self, monkeypatch: pytest.MonkeyPatch
