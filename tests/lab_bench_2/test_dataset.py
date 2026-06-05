@@ -11,6 +11,8 @@ from lab_bench_2 import file_downloader
 from lab_bench_2.dataset import (
     LAB_BENCH_2_DATASET_PATH,
     LAB_BENCH_2_DATASET_REVISION,
+    MAX_TAGS_IN_DATASET_NAME,
+    _multi_tags_dataset_name,
     _question_supports_mode,
     load_multi_tags_dataset,
     parse_validator_params,
@@ -254,6 +256,30 @@ class TestFileModeIntegration:
         assert "difficulty" not in sut.metadata
 
 
+class TestMultiTagsDatasetName:
+    def test_single_tag(self) -> None:
+        assert _multi_tags_dataset_name(["litqa3"]) == "lab_bench_2_litqa3"
+
+    def test_lists_all_tags_sorted_when_within_cap(self) -> None:
+        # given tags out of order and within the cap
+        assert (
+            _multi_tags_dataset_name(["litqa3", "cloning"])
+            == "lab_bench_2_cloning+litqa3"
+        )
+
+    def test_lists_all_tags_when_exactly_at_cap(self) -> None:
+        tags = [f"t{i}" for i in range(MAX_TAGS_IN_DATASET_NAME)]
+        expected = "lab_bench_2_" + "+".join(sorted(tags))
+        assert _multi_tags_dataset_name(tags) == expected
+
+    def test_elides_surplus_when_over_cap(self) -> None:
+        # given one more tag than the cap
+        tags = [f"t{i}" for i in range(MAX_TAGS_IN_DATASET_NAME + 1)]
+        shown = "+".join(sorted(tags)[:MAX_TAGS_IN_DATASET_NAME])
+        # then the surplus is elided as +N-more
+        assert _multi_tags_dataset_name(tags) == f"lab_bench_2_{shown}+1-more"
+
+
 class TestLoadAllTagsDataset:
     def test_concatenates_tags_and_preserves_tag_metadata(
         self, monkeypatch: pytest.MonkeyPatch
@@ -267,9 +293,10 @@ class TestLoadAllTagsDataset:
         # when loading several tags as one dataset
         sut = load_multi_tags_dataset(["litqa3", "cloning"], mode="file")
 
-        # then samples are concatenated in tag order, each keeping its tag
+        # then samples are concatenated in tag order, each keeping its tag,
+        # and the dataset name is derived from the (sorted) tag selection
         samples = list(sut)
-        assert sut.name == "lab_bench_2_all"
+        assert sut.name == "lab_bench_2_cloning+litqa3"
         assert [s.metadata["tag"] for s in samples if s.metadata] == [
             "litqa3",
             "cloning",
