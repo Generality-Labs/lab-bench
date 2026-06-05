@@ -76,6 +76,39 @@ See `uv run inspect eval --help` for all available options.
 - `solver` (SolverType): The solver to run. Options: ``bare``: a plain single-turn `generate()`., ``tools``: the server-side agentic configuration. The model is given provider-native, **server-side** tools — WebSearch and CodeExecution — and runs Inspect's tool-use loop., ``agentic``: the client-side agentic configuration. The model is given ``python``/``bash`` (and, with an external provider key, ``web_search``) tools in a Docker sandbox. (default: `'bare'`)
 <!-- /Parameters: Automatically Generated -->
 
+### Reference run configs
+
+The benchmark's two headline configurations — `bare` and `tools` at high
+reasoning effort — are checked in as Inspect [run configs](https://inspect.aisi.org.uk/task-configuration.html#run-config)
+under [`run_configs/`](run_configs/), one file per (solver × mode) combination.
+Each pins the solver, the file-delivery `mode`, the mode's tag subset, and the
+generation config taken from the reference implementation
+(`max_tokens: 64000` and `timeout: 3600` — see
+`evals/llm_configs.py` in [`EdisonScientific/labbench2`](https://github.com/EdisonScientific/labbench2) —
+plus `reasoning_effort: high` for the tools configs). The `file` and `inject`
+configs also pin the default `grader` model role; the `retrieve` configs omit it
+because their tags (`cloning`, `seqqa2`) are scored deterministically. The model
+under test is left to the CLI:
+
+```bash
+# bare solver, inject-mode tags
+uv run inspect eval --run-config src/lab_bench_2/run_configs/bare_inject.yaml \
+  --model openai/gpt-5-nano
+
+# tools solver at high reasoning, file-mode tags
+uv run inspect eval --run-config src/lab_bench_2/run_configs/tools_high_file.yaml \
+  --model anthropic/claude-opus-4-1-20250805
+```
+
+| Config file                 | Solver | Mode       | Tags                                                                                            |
+| --------------------------- | ------ | ---------- |-------------------------------------------------------------------------------------------------|
+| `bare_file.yaml`            | bare   | `file`     | cloning, figqa2-img, figqa2-pdf, protocolqa2, seqqa2, sourcequality, tableqa2-img, tableqa2-pdf |
+| `bare_inject.yaml`          | bare   | `inject`   | cloning, dbqa2, figqa2, litqa3, patentqa, seqqa2, suppqa2, tableqa2, trialqa                    |
+| `bare_retrieve.yaml`        | bare   | `retrieve` | cloning, seqqa2                                                                                 |
+| `tools_high_file.yaml`      | tools  | `file`     | (same as `bare_file.yaml`)                                                                      |
+| `tools_high_inject.yaml`    | tools  | `inject`   | (same as `bare_inject.yaml`)                                                                    |
+| `tools_high_retrieve.yaml`  | tools  | `retrieve` | (same as `bare_retrieve.yaml`)                                                                  |
+
 ## Solvers
 
 The benchmark can run each model in three configurations, selected via the `solver`
