@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import os
 from typing import Literal
 
@@ -17,6 +18,8 @@ _WEB_SEARCH_PROVIDERS_BY_KEY: dict[str, Literal["tavily", "exa", "google"]] = {
     "EXA_API_KEY": "exa",
     "GOOGLE_CSE_API_KEY": "google",
 }
+
+logger = logging.getLogger(__name__)
 
 
 def web_search_available() -> bool:
@@ -42,4 +45,8 @@ def sandbox_tools(timeout: int = 180) -> list[Tool]:
     ws = _build_web_search()
     if ws is not None:
         tools.append(ws)
+    else:
+        logger.warn(
+            "No search provider api key found, so no web search tool is given to the agent"
+        )
     return tools
