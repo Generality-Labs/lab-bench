@@ -3,7 +3,7 @@
 LABBench2 evaluates language models and research agents on life-science tasks spanning literature reasoning, database access, figures, tables, protocols, source quality, sequence analysis, cloning, patents, and clinical trials.
 
 <!-- Contributors: Automatically Generated -->
-Contributed by [@iphan](https://github.com/iphan)
+Contributed by [@iphan](https://github.com/iphan), [@ItsTania](https://github.com/ItsTania), [@lewtun](https://github.com/lewtun), [@Sunishchal](https://github.com/Sunishchal)
 <!-- /Contributors: Automatically Generated -->
 
 <!-- Usage: Automatically Generated -->
