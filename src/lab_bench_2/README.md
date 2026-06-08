@@ -286,10 +286,10 @@ columns are from our runs.
 | ----------- | -------- | ------- | -------------------- |------:|-----------:|---------:|-------:|---------:|
 | litqa3      | N/A      | tools   | `@tools,high`        |  168† |      0.815 |    0.799 |  0.032 |    9m59s |
 | dbqa2       | N/A      | bare    | `bare`               |    86 |      0.070 |    0.058 |  0.025 |    1m51s |
-| cloning     | inject   | tools   | `@tools,high`        |    14 |      0.286 |    0.286 |  0.125 | 1h41m39s |
+| cloning     | inject   | tools   | `@tools,high`        |   14§ |      0.286 |    0.286 |  0.125 | 1h41m39s |
 | figqa2-img  | file     | bare    | `bare`               |   101 |      0.564 |    0.525 |  0.050 |    1m10s |
 | seqqa2      | retrieve | bare    | `bare`               |   200 |      0.095 |    0.115 |  0.023 |    2m31s |
-| protocolqa2 | file     | agentic | `@tools,high`\*      |   125 |      0.416 |    0.390 |  0.044 |    13m57 |
+| protocolqa2 | file     | agentic | `@tools,high`\*      |  125‡ |      0.416 |    0.390 |  0.044 |    13m57 |
 
 \* The paper has no client-side-sandbox (`agentic`) config; `@tools,high`
 (server-side tools) is the closest augmented baseline.
@@ -298,18 +298,28 @@ columns are from our runs.
 the refusals note below) and excluded as unscored; the reported accuracy and
 stderr are over the 159 scored samples.
 
+‡ `protocolqa2`: 2 of the 125 grader calls were blocked by the content filter
+(see the refusals note below) and excluded as unscored; the reported
+accuracy and stderr are over the 123 scored samples.
+
+§ `cloning`: its low score is partly a refusal artifact, not pure capability.
+The model under test declined ~40% of this small 14-question set on biosecurity
+grounds (refusing to give actionable cloning protocols), plus 1 OpenAI API-level
+content-filter block.
+
 ### Notes
 
 - Every GPT-5.2 run tracks its matched paper reference within stderr (≤ ~1
   stderr).
 - Grader refusals are excluded from the results. The LLM judge
   (`claude-sonnet-4-5`) is occasionally blocked by Anthropic's content filter on
-  biosecurity-adjacent questions, which
-  returns an empty response with `stop_reason=content_filter`. The sample
-  is marked **unscored** (`verdict_source="refusal"`) rather than counted wrong.
+  biosecurity-adjacent questions, which returns an empty response with
+  `stop_reason=content_filter`. The sample is retried up to 3× and, if still
+  blocked, marked **unscored** (`verdict_source="refusal"`) rather than counted
+  wrong.
 - LLM-judge tags (`litqa3`, `dbqa2`, `figqa2-img`, `protocolqa2`) are graded by
-  `claude-sonnet-4-5`; deterministic tags (`seqqa2`, `cloning`) use no grader
-  and are unaffected by refusals.
+  `claude-sonnet-4-5`; deterministic tags (`seqqa2`, `cloning`) use no grader,
+  so they are unaffected by *grader* refusals.
 
 ### Reproducibility
 
