@@ -14,6 +14,13 @@ where = ["src"]
 [tool.setuptools.package-data]
 "*" = ["eval.yaml"]
 
+# Evaluation checks (see AUTOMATED_CHECKS.md). The template preset expects one
+# package per evaluation directly under src/, registered under
+# [project.entry-points.inspect_ai]; src/utils is linted as a helper package
+# and src/examples is not linted.
+[tool.inspect-evals-lint]
+preset = "template"
+
 [tool.ruff]
 extend-exclude = [
     "agent_artefacts",
@@ -160,11 +167,16 @@ lab_bench_2 = "lab_bench_2"
 # Reference implementation's deterministic scoring code (CC BY-SA 4.0), scoped to
 # this eval rather than core. Pulled as a dependency rather than vendored; source
 # + pin in [tool.uv.sources]. See src/lab_bench_2/README.md.
-lab_bench_2 = ["labbench2"]
+lab_bench_2 = [
+    "labbench2",
+    "pillow",     # attachment_builder downscales oversized image attachments
+    "pydantic",   # scorers validate the grader's structured output
+]
 test = []
 
 [dependency-groups]
 dev = [
+    "inspect-evals-lint==0.4.2",  # Evaluation checks; see AUTOMATED_CHECKS.md
     "anthropic>=0.105.0",
     "inspect-scout>=0.3.0",  # llm_scanner API used by agent_artefacts/trajectory_analysis/inspect_scout/
     "mypy",

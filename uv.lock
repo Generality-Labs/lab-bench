@@ -1428,6 +1428,19 @@ wheels = [
 ]
 
 [[package]]
+name = "inspect-evals-lint"
+version = "0.4.2"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "pyyaml" },
+    { name = "rich" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/01/b3/38aa64249bf862aaf3ce9aa4af0e6b60537d4876c8e50721829755d512a8/inspect_evals_lint-0.4.2.tar.gz", hash = "sha256:fc16557369d5dd8ede0efbf25631812692924db7af31513914799771c1dac316", size = 193965, upload-time = "2026-09-21T08:50:54.487Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/16/87/b7555007feaf431031b9a7b172826f37eaa1146484de0622fec8df0414ad/inspect_evals_lint-0.4.2-py3-none-any.whl", hash = "sha256:41076b18142a866ce1bb27cf5d83bd451b1949527085d699c26c871721390f05", size = 76684, upload-time = "2026-09-21T08:50:53.072Z" },
+]
+
+[[package]]
 name = "inspect-scout"
 version = "0.4.27"
 source = { registry = "https://pypi.org/simple" }
@@ -1797,11 +1810,14 @@ dependencies = [
 [package.optional-dependencies]
 lab-bench-2 = [
     { name = "labbench2" },
+    { name = "pillow" },
+    { name = "pydantic" },
 ]
 
 [package.dev-dependencies]
 dev = [
     { name = "anthropic" },
+    { name = "inspect-evals-lint" },
     { name = "inspect-scout" },
     { name = "mypy" },
     { name = "openai" },
@@ -1821,6 +1837,8 @@ requires-dist = [
     { name = "datasets", specifier = ">=4.8.5" },
     { name = "inspect-ai", specifier = ">=0.3.234" },
     { name = "labbench2", marker = "extra == 'lab-bench-2'", git = "https://github.com/EdisonScientific/labbench2.git?rev=c028ecdcf144b55ffcd92b68be45081df5628c20" },
+    { name = "pillow", marker = "extra == 'lab-bench-2'" },
+    { name = "pydantic", marker = "extra == 'lab-bench-2'" },
     { name = "pyyaml", specifier = ">=5.1.0" },
 ]
 provides-extras = ["lab-bench-2", "test"]
@@ -1828,6 +1846,7 @@ provides-extras = ["lab-bench-2", "test"]
 [package.metadata.requires-dev]
 dev = [
     { name = "anthropic", specifier = ">=0.105.0" },
+    { name = "inspect-evals-lint", specifier = "==0.4.2" },
     { name = "inspect-scout", specifier = ">=0.3.0" },
     { name = "mypy" },
     { name = "openai", specifier = ">=2.40.0" },
